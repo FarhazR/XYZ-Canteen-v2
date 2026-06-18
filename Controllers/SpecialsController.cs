@@ -118,6 +118,25 @@ namespace CanteenAPI.Controllers
             if (request.Date.Date < DateTime.Today)
                 return BadRequest(new { message = "Cannot publish a special for a past date." });
 
+            // Check for overlapping specials on the same date, meal type, and outlet
+            var existingSpecials = _context.TodaysSpecials
+                .Where(s => s.Date.Date == request.Date.Date && s.MealType == request.MealType)
+                .ToList();
+
+            var conflictingOutlets = request.ApplicableOutlets
+                .Where(outlet => existingSpecials.Any(s =>
+                    s.ApplicableOutlets
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(o => o.Trim())
+                        .Contains(outlet)))
+                .ToList();
+
+            if (conflictingOutlets.Any())
+                return BadRequest(new
+                {
+                    message = $"A special already exists for {request.MealType} on {request.Date:yyyy-MM-dd} at: {string.Join(", ", conflictingOutlets)}"
+                });
+            
             var special = new TodaysSpecial
             {
                 SpecialName = request.SpecialName,
@@ -166,6 +185,29 @@ namespace CanteenAPI.Controllers
                 if (invalidOutlets.Any())
                     return BadRequest(new { message = $"Invalid outlet(s): {string.Join(", ", invalidOutlets)}" });
 
+                var checkDate = request.Date?.Date ?? special.Date.Date;
+                var checkMealType = request.MealType ?? special.MealType;
+
+                var existingSpecials = _context.TodaysSpecials
+                    .Where(s => s.SpecialID != special.SpecialID &&
+                                s.Date.Date == checkDate &&
+                                s.MealType == checkMealType)
+                    .ToList();
+
+                var conflictingOutlets = request.ApplicableOutlets
+                    .Where(outlet => existingSpecials.Any(s =>
+                        s.ApplicableOutlets
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(o => o.Trim())
+                            .Contains(outlet)))
+                    .ToList();
+
+                if (conflictingOutlets.Any())
+                    return BadRequest(new
+                    {
+                        message = $"A special already exists for {checkMealType} on {checkDate:yyyy-MM-dd} at: {string.Join(", ", conflictingOutlets)}"
+                    });
+                
                 special.ApplicableOutlets = string.Join(", ", request.ApplicableOutlets);
             }
 
