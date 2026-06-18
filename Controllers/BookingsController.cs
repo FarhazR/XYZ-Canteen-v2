@@ -42,12 +42,45 @@ namespace CanteenAPI.Controllers
             return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         }
 
-        private bool IsPastCutoff(DateTime date, string mealType)
+        private static bool IsPastCutoff(DateTime date, string mealType)
         {
             if (!CutoffTimes.ContainsKey(mealType)) return false;
-            var now = DateTime.Now;
             var cutoff = date.Date + CutoffTimes[mealType];
-            return now > cutoff;
+            return DateTime.Now > cutoff;
+        }
+
+        // GET api/bookings — admin only
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public IActionResult GetAll()
+        {
+            var bookings = _context.Bookings
+                .OrderByDescending(b => b.FromDate)
+                .ToList()
+                .Select(b => new BookingResponse
+                {
+                    BookingID = b.BookingID,
+                    EmployeeID = b.EmployeeID,
+                    EmployeeName = b.Employee != null ? b.Employee.Name : string.Empty,
+                    FromDate = b.FromDate,
+                    ToDate = b.ToDate,
+                    CanteenLocation = b.CanteenLocation,
+                    MealType = b.MealType,
+                    BookingFor = b.BookingFor,
+                    GuestCount = b.GuestCount,
+                    VegCount = b.VegCount,
+                    PaneerCount = b.PaneerCount,
+                    NonVegCount = b.NonVegCount,
+                    IsSpecialMeal = b.IsSpecialMeal,
+                    Status = b.Status,
+                    CreatedAt = b.CreatedAt,
+                    CanModify = b.Status == "Confirmed" &&
+                                b.FromDate.Date >= DateTime.Today &&
+                                !IsPastCutoff(b.FromDate, b.MealType)
+                })
+                .ToList();
+
+            return Ok(bookings);
         }
 
         // GET api/bookings/my
@@ -85,6 +118,7 @@ namespace CanteenAPI.Controllers
 
             return Ok(bookings);
         }
+
         // GET api/bookings/{id}
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
@@ -150,17 +184,45 @@ namespace CanteenAPI.Controllers
                 return BadRequest(new { message = $"Booking cutoff time for {request.MealType} has passed." });
 
             // Validate guest booking
-            if (request.BookingFor == "Guests" && (request.GuestCount == null || request.GuestCount <= 0))
+            if (request.BookingFor == "Guests" &&
+                (request.GuestCount == null || request.GuestCount <= 0))
                 return BadRequest(new { message = "Guest count is required for guest bookings." });
 
             // Validate meal counts
             if (!request.IsSpecialMeal)
             {
-                if (request.BookingFor == "Self" &&
-                    request.VegCount == 0 &&
-                    request.PaneerCount == 0 &&
-                    request.NonVegCount == 0)
-                    return BadRequest(new { message = "Please select a meal category." });
+                if (request.BookingFor == "Self")
+                {
+                    var totalCount = request.VegCount + request.PaneerCount + request.NonVegCount;
+                    if (totalCount == 0)
+                        return BadRequest(new { message = "Please select a meal category." });
+                    if (totalCount > 1)
+                        return BadRequest(new { message = "Self booking allows only one meal." });
+                }
+
+                if (request.BookingFor == "Guests")
+                {
+                    var totalMeals = request.VegCount + request.PaneerCount + request.NonVegCount;
+                    if (totalMeals == 0)
+                        return BadRequest(new { message = "Please enter meal counts for guests." });
+                    if (request.GuestCount.HasValue && totalMeals != request.GuestCount.Value)
+                        return BadRequest(new { message = "Total meal counts must equal number of guests." });
+                }
+            }
+
+            // Validate Today's Special if selected
+            if (request.IsSpecialMeal)
+            {
+                if (request.MealType != "Lunch" && request.MealType != "Dinner")
+                    return BadRequest(new { message = "Today's Special is only available for Lunch and Dinner." });
+
+                var specialExists = _context.TodaysSpecials
+                    .Any(s => s.Date.Date == request.FromDate.Date &&
+                              s.MealType == request.MealType &&
+                              s.ApplicableOutlets.Contains(request.CanteenLocation));
+
+                if (!specialExists)
+                    return BadRequest(new { message = "No Today's Special is available for the selected date, meal type, and outlet." });
             }
 
             var booking = new Booking
@@ -203,7 +265,7 @@ namespace CanteenAPI.Controllers
                 return BadRequest(new { message = "Cannot modify a cancelled booking." });
 
             if (IsPastCutoff(booking.FromDate, booking.MealType))
-                return BadRequest(new { message = $"Cutoff time for this booking has passed." });
+                return BadRequest(new { message = "Cutoff time for this booking has passed." });
 
             if (request.MealType != null && !ValidMealTypes.Contains(request.MealType))
                 return BadRequest(new { message = "Invalid meal type." });
@@ -211,7 +273,6 @@ namespace CanteenAPI.Controllers
             if (request.CanteenLocation != null && !ValidLocations.Contains(request.CanteenLocation))
                 return BadRequest(new { message = "Invalid canteen location." });
 
-            // Apply updates
             if (request.FromDate != null) booking.FromDate = request.FromDate.Value.Date;
             if (request.ToDate != null) booking.ToDate = request.ToDate.Value.Date;
             if (request.CanteenLocation != null) booking.CanteenLocation = request.CanteenLocation;

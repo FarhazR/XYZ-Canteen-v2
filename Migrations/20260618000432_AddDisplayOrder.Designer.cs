@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CanteenAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260615041412_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260618000432_AddDisplayOrder")]
+    partial class AddDisplayOrder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -120,6 +120,9 @@ namespace CanteenAPI.Migrations
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ItemName")
                         .IsRequired()

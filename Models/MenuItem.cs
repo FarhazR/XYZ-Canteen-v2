@@ -11,5 +11,6 @@ namespace CanteenAPI.Models
         public string ItemName { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string? PhotoUrl { get; set; }
+        public int DisplayOrder { get; set; } = 0;
     }
 }

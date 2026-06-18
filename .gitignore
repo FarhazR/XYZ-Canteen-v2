@@ -6,3 +6,4 @@ obj/
 *.cache
 *.db-shm
 *.db-wal
+*.cs.un~

@@ -33,6 +33,7 @@ namespace CanteenAPI.Controllers
             };
 
             var items = _context.MenuItems
+                .OrderBy(m => m.DisplayOrder)
                 .Select(m => new MenuItemResponse
                 {
                     MenuItemID = m.MenuItemID,
@@ -40,7 +41,8 @@ namespace CanteenAPI.Controllers
                     MealType = m.MealType,
                     ItemName = m.ItemName,
                     Description = m.Description,
-                    PhotoUrl = m.PhotoUrl
+                    PhotoUrl = m.PhotoUrl,
+                    DisplayOrder = m.DisplayOrder
                 })
                 .ToList();
 
@@ -75,6 +77,7 @@ namespace CanteenAPI.Controllers
 
             var items = _context.MenuItems
                 .Where(m => m.DayOfWeek == day)
+                .OrderBy(m => m.DisplayOrder)
                 .Select(m => new MenuItemResponse
                 {
                     MenuItemID = m.MenuItemID,
@@ -82,7 +85,8 @@ namespace CanteenAPI.Controllers
                     MealType = m.MealType,
                     ItemName = m.ItemName,
                     Description = m.Description,
-                    PhotoUrl = m.PhotoUrl
+                    PhotoUrl = m.PhotoUrl,
+                    DisplayOrder = m.DisplayOrder
                 })
                 .ToList();
 
