@@ -12,16 +12,19 @@ ASP.NET Core Web API backend for the PSU Canteen Meal Booking mobile application
 | Runtime | .NET | 8.0 |
 | Framework | ASP.NET Core Web API | 8.0 |
 | ORM | Entity Framework Core | 8.0.0 |
-| Database (Prototype) | SQLite | 8.0.0 |
+| Database | Microsoft SQL Server (Express for development) | 2022 |
 | Authentication | JWT Bearer | 8.0.0 |
 | Password Hashing | BCrypt.Net-Next | 4.0.3 |
 | API Documentation | Swashbuckle (Swagger) | 6.5.0 |
+| Database Tooling | SQL Server Management Studio (SSMS) | Latest |
 
 ---
 
 ## Prerequisites
 
-- .NET 8 SDK — download from https://dotnet.microsoft.com/download
+- .NET 8 SDK — https://dotnet.microsoft.com/download
+- SQL Server Express (or access to a SQL Server instance) — https://www.microsoft.com/en-us/sql-server/sql-server-downloads
+- SQL Server Management Studio (recommended for inspecting the database) — https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms
 - dotnet-ef CLI tool
 
 Verify .NET installation:
@@ -50,15 +53,25 @@ cd CanteenAPI
 dotnet restore
 ```
 
-### 3. Create and seed the database
+### 3. Update the connection string
+
+Open `appsettings.json` and confirm the `DefaultConnection` string matches
+your local SQL Server instance name. Default format:
+```
+Server=localhost\SQLEXPRESS;Database=CanteenDB;Trusted_Connection=True;TrustServerCertificate=True;
+```
+Replace `localhost\SQLEXPRESS` with your own instance name if different
+(check via SSMS or `services.msc` under SQL Server services).
+
+### 4. Create and seed the database
 ```
 dotnet ef database update
 ```
 
-This creates a local `canteen.db` SQLite file and automatically seeds it with
-dummy employees and the weekly menu on first run.
+This creates the `CanteenDB` database on your SQL Server instance and
+automatically seeds it with dummy employees and the weekly menu on first run.
 
-### 4. Run the project
+### 5. Run the project
 ```
 dotnet run --launch-profile http
 ```
@@ -135,10 +148,17 @@ Authorization: Bearer [token]
 | GET | /api/menu | Employee, Admin | Full weekly menu grouped by day |
 | GET | /api/menu/{day} | Employee, Admin | Single day menu (e.g. Monday) |
 
+### Menu Administration
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/menu/admin/preview | Admin only | Preview Add/Update/Delete changes |
+| POST | /api/menu/admin/confirm | Admin only | Apply previewed changes |
+
 ### Bookings
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
 | POST | /api/bookings | Employee, Admin | Place a new booking |
+| GET | /api/bookings | Admin only | View all bookings |
 | GET | /api/bookings/my | Employee, Admin | Get current user's bookings |
 | GET | /api/bookings/{id} | Employee, Admin | Get a specific booking |
 | PUT | /api/bookings/{id} | Employee, Admin | Modify a booking |
@@ -153,6 +173,11 @@ Authorization: Bearer [token]
 | PUT | /api/specials/{id} | Admin only | Update a published special |
 | DELETE | /api/specials/{id} | Admin only | Remove a published special |
 
+### File Upload
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/upload/photo | Admin only | Upload a photo, returns relative URL |
+
 ---
 
 ## Valid Field Values
@@ -163,11 +188,11 @@ Authorization: Bearer [token]
 - Evening Snacks
 - Dinner
 
-### Canteen Locations (placeholders — to be updated with actual outlet names)
-- Outlet 1
-- Outlet 2
-- Outlet 3
-- Outlet 4
+### Canteen Locations
+- Central Canteen
+- Administrative Building
+- Central Control Room
+- Central Workshop
 
 ### Booking For
 - Self
@@ -176,6 +201,11 @@ Authorization: Bearer [token]
 ### Today's Special Meal Types (Lunch and Dinner only)
 - Lunch
 - Dinner
+
+### Menu Change Actions (admin)
+- Add
+- Update
+- Delete
 
 ---
 
@@ -189,7 +219,30 @@ Authorization: Bearer [token]
 | Dinner | 5:00 PM |
 
 Bookings, modifications, and cancellations are not permitted after the
-cutoff time for that meal on the booking's From Date.
+cutoff time for that meal on the booking's From Date. The `canModify`
+field in booking responses reflects this automatically.
+
+---
+
+## Photo Uploads
+
+Photos for Today's Special and Menu Items are uploaded directly through
+the app (camera or gallery) rather than referenced by external URL.
+
+Flow:
+1. Frontend uploads the image file to `POST /api/upload/photo`
+2. Backend validates (jpg/jpeg/png/webp only, 5 MB max), stores it in
+   `wwwroot/uploads/`, and returns a relative path like `/uploads/xxx.jpg`
+3. Frontend includes that path as `photoUrl` when creating or updating a
+   Special or Menu Item
+4. To display the photo, the frontend must prefix the stored path with
+   the backend's base URL, e.g.
+   `http://[backend-ip]:[port]/uploads/xxx.jpg`
+
+Uploaded files are stored locally for the prototype and can be migrated
+to cloud storage (e.g. Azure Blob Storage) in production without changing
+the API contract — only the storage implementation inside the Upload
+controller would change.
 
 ---
 
@@ -213,9 +266,9 @@ Authorization: Bearer [token]
 Content-Type: application/json
 
 {
-  "fromDate": "2026-06-16",
-  "toDate": "2026-06-16",
-  "canteenLocation": "Outlet 1",
+  "fromDate": "2026-06-22",
+  "toDate": "2026-06-22",
+  "canteenLocation": "Central Canteen",
   "mealType": "Lunch",
   "bookingFor": "Self",
   "vegCount": 1,
@@ -232,9 +285,9 @@ Authorization: Bearer [token]
 Content-Type: application/json
 
 {
-  "fromDate": "2026-06-16",
-  "toDate": "2026-06-18",
-  "canteenLocation": "Outlet 2",
+  "fromDate": "2026-06-22",
+  "toDate": "2026-06-24",
+  "canteenLocation": "Administrative Building",
   "mealType": "Dinner",
   "bookingFor": "Guests",
   "guestCount": 5,
@@ -254,10 +307,42 @@ Content-Type: application/json
 {
   "specialName": "Mutton Biryani",
   "description": "Slow cooked mutton biryani with raita and salan",
-  "photoUrl": null,
+  "photoUrl": "/uploads/3f2a1b4c-xxxx.jpg",
   "mealType": "Lunch",
-  "date": "2026-06-16",
-  "applicableOutlets": ["Outlet 1", "Outlet 2"]
+  "date": "2026-06-22",
+  "applicableOutlets": ["Central Canteen", "Administrative Building"]
+}
+```
+
+### Upload a Photo (Admin only)
+```
+POST /api/upload/photo
+Authorization: Bearer [admin token]
+Content-Type: multipart/form-data
+
+file: [binary image data]
+```
+
+### Preview Menu Changes (Admin only)
+```
+POST /api/menu/admin/preview
+Authorization: Bearer [admin token]
+Content-Type: application/json
+
+{
+  "changes": [
+    {
+      "action": "Add",
+      "newItem": {
+        "dayOfWeek": "Monday",
+        "mealType": "Lunch",
+        "itemName": "Buttermilk",
+        "description": "Chilled spiced buttermilk",
+        "photoUrl": null,
+        "displayOrder": 6
+      }
+    }
+  ]
 }
 ```
 
@@ -271,7 +356,9 @@ CanteenAPI/
 │   ├── AuthController.cs
 │   ├── BookingsController.cs
 │   ├── MenuController.cs
-│   └── SpecialsController.cs
+│   ├── MenuAdminController.cs
+│   ├── SpecialsController.cs
+│   └── UploadController.cs
 ├── Data/
 │   ├── AppDbContext.cs
 │   └── DbSeeder.cs
@@ -280,7 +367,7 @@ CanteenAPI/
 │   ├── BookingDTOs.cs
 │   ├── MenuDTOs.cs
 │   └── SpecialDTOs.cs
-├── migrations/
+├── Migrations/
 ├── Models/
 │   ├── Booking.cs
 │   ├── Employee.cs
@@ -288,8 +375,9 @@ CanteenAPI/
 │   └── TodaysSpecial.cs
 ├── Properties/
 │   └── launchSettings.json
+├── wwwroot/
+│   └── uploads/
 ├── appsettings.json
-├── canteen.db
 ├── CanteenAPI.csproj
 └── Program.cs
 ```
@@ -298,30 +386,35 @@ CanteenAPI/
 
 ## Notes for Frontend Integration
 
-- The `canModify` field in booking responses indicates whether the booking
-  can still be edited or cancelled. The frontend should use this flag to
-  show or hide edit and cancel buttons rather than calculating cutoff
-  times independently.
-- Today's Special outlets are returned as a list of strings. During booking,
-  check if the selected outlet appears in the special's `applicableOutlets`
-  list before showing the special option to the user.
-- The weekly menu is fixed and does not change. It can be cached on the
-  frontend after the first load.
+- The `canModify` field in booking responses indicates whether a booking
+  can still be edited or cancelled. Use this flag rather than calculating
+  cutoff times independently.
+- Today's Special outlets are returned as a list of strings. Check if the
+  selected outlet appears in the special's `applicableOutlets` before
+  showing the special option during booking.
+- The weekly menu rarely changes and can be cached on the frontend after
+  first load.
+- When displaying weekly menu items, group by `mealType` first, then sort
+  by `displayOrder` within each group — items are returned sorted by
+  `displayOrder` globally, not per meal type.
+- Photo uploads are a two-step process: upload first via
+  `/api/upload/photo`, then use the returned path in the `photoUrl` field
+  of the Special or Menu item.
+- Stored photo paths are relative — prefix with the backend base URL to
+  render images on the frontend.
 
 ---
 
 ## Known Limitations (Prototype)
 
-- Self booking does not yet enforce single meal category selection on the
-  backend — to be added before production
-- Outlet names are placeholders pending confirmation from canteen management
-- Breakfast cutoff time (8:30 AM) is subject to change
-- No file upload support for photos — URL references only
-- Production SQL Server integration pending
+- Database currently runs on local SQL Server Express with dummy seeded
+  data; production will connect to the organization's actual employee
+  database
+- Uploaded photos are stored on local disk; production should migrate
+  this to cloud storage (e.g. Azure Blob Storage)
+- `publishedBy` field on Today's Special currently returns empty —
+  navigation property needs an explicit `.Include()` (cosmetic, non-blocking)
 
 ---
 
 *Developed as part of PSU internship project, June 2026.*
-```
-
----

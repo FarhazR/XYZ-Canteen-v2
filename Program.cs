@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration
+    options.UseSqlServer(builder.Configuration
         .GetConnectionString("DefaultConnection")));
 
 // JWT Authentication
