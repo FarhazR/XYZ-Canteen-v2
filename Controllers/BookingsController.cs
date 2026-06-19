@@ -29,7 +29,7 @@ namespace CanteenAPI.Controllers
 
         private static readonly List<string> ValidLocations = new()
         {
-            "Outlet 1", "Outlet 2", "Outlet 3", "Outlet 4"
+            "Central Canteen", "Administrative Buillding", "Central Control Room", "Central Workshop"
         };
 
         public BookingsController(AppDbContext context)
