@@ -1,0 +1,43 @@
+BASE URL: http://[backend-ip]:[port]/api
+
+═══════════════════════════════════════
+AUTHENTICATION
+═══════════════════════════════════════
+POST   /api/Auth/login              Public           Login, returns JWT token
+GET    /api/Auth/me                 Authenticated     Get current user info
+
+═══════════════════════════════════════
+MENU (READ)
+═══════════════════════════════════════
+GET    /api/Menu                    Authenticated     Full weekly menu, grouped by day → meal type
+GET    /api/Menu/{day}              Authenticated     Single day's menu (e.g. /api/menu/Monday)
+
+═══════════════════════════════════════
+MENU (ADMIN MANAGEMENT)
+═══════════════════════════════════════
+POST   /api/menu/admin/preview      Admin only        Submit Add/Update/Delete changes, get summary + token
+POST   /api/menu/admin/confirm      Admin only        Apply previewed changes using the token
+
+═══════════════════════════════════════
+BOOKINGS
+═══════════════════════════════════════
+POST   /api/Bookings                Authenticated     Place a new booking
+GET    /api/Bookings                Admin only        View all bookings (all employees)
+GET    /api/Bookings/my             Authenticated     View own bookings
+GET    /api/Bookings/{id}           Authenticated     View a specific booking (own only)
+PUT    /api/Bookings/{id}           Authenticated     Modify a booking (own only, before cutoff)
+DELETE /api/Bookings/{id}           Authenticated     Cancel a booking (own only, before cutoff)
+
+═══════════════════════════════════════
+TODAY'S SPECIAL
+═══════════════════════════════════════
+GET    /api/Specials/today          Authenticated     Specials active today
+GET    /api/Specials                Authenticated     All published specials
+POST   /api/Specials                Admin only        Publish a new special
+PUT    /api/Specials/{id}           Admin only        Update a special
+DELETE /api/Specials/{id}           Admin only        Remove a special
+
+═══════════════════════════════════════
+FILE UPLOAD
+═══════════════════════════════════════
+POST   /api/Upload/photo            Admin only        Upload an image, returns relative photoUrl
