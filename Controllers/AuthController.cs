@@ -27,17 +27,24 @@ namespace CanteenAPI.Controllers
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
-            var employee = _context.Employees
-                .FirstOrDefault(e => e.EmployeeID == request.EmployeeID);
+            if (string.IsNullOrEmpty(request.Username))
+                return BadRequest(new { message = "Please provide a username." });
+
+            Models.Employee? employee = null;
+
+            if (!string.IsNullOrEmpty(request.Username))
+            {
+                employee = _context.Employees
+                    .FirstOrDefault(e => e.Username == request.Username.ToLower().Trim());
+            }
 
             if (employee == null)
-                return Unauthorized(new { message = "Invalid Employee ID or password." });
+                return Unauthorized(new { message = "Invalid credentials." });
 
-            bool validPassword = BCrypt.Net.BCrypt.Verify(
-                request.Password, employee.PasswordHash);
+            bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, employee.PasswordHash);
 
             if (!validPassword)
-                return Unauthorized(new { message = "Invalid Employee ID or password." });
+                return Unauthorized(new { message = "Invalid credentials." });
 
             var token = GenerateToken(employee);
 
@@ -46,6 +53,7 @@ namespace CanteenAPI.Controllers
                 Token = token,
                 EmployeeID = employee.EmployeeID,
                 Name = employee.Name,
+                Username = employee.Username,
                 Department = employee.Department,
                 Role = employee.Role
             });
@@ -72,6 +80,7 @@ namespace CanteenAPI.Controllers
             {
                 EmployeeID = employee.EmployeeID,
                 Name = employee.Name,
+                Username = employee.Username,
                 Department = employee.Department,
                 Role = employee.Role
             });

@@ -2,7 +2,7 @@ namespace CanteenAPI.DTOs
 {
     public class LoginRequest
     {
-        public int? EmployeeID { get; set; }
+        //public int? EmployeeID { get; set; }
         public string? Username { get; set; }
         public string Password { get; set; } = string.Empty;
     }
