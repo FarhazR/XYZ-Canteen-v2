@@ -291,14 +291,21 @@ namespace CanteenAPI.Controllers
 
         // DELETE api/bookings/{id}
         [HttpDelete("{id}")]
-        public IActionResult Cancel(int id)
+        public async Task<IActionResult> Cancel(int id)
         {
             var employeeID = GetCurrentEmployeeID();
 
             var booking = _context.Bookings
-                .FirstOrDefault(b => b.BookingID == id && b.EmployeeID == employeeID);
+                .FirstOrDefault(b => b.BookingID == id);
 
             if (booking == null)
+                return NotFound(new { message = "Booking not found." });
+
+            var isAdmin = User.IsInRole("Admin");
+            var isOwnBooking = booking.EmployeeID == employeeID;
+
+            // Employees can only cancel their own bookings
+            if (!isAdmin && !isOwnBooking)
                 return NotFound(new { message = "Booking not found." });
 
             if (booking.Status == "Cancelled")
@@ -309,6 +316,21 @@ namespace CanteenAPI.Controllers
 
             booking.Status = "Cancelled";
             _context.SaveChanges();
+
+            if (isAdmin && !isOwnBooking)
+            {
+                var notif = new Notification
+                {
+                    EmployeeID = booking.EmployeeID,
+                    Title = "Booking Cancelled",
+                    Message = $"Your booking #{booking.BookingID} for {booking.MealType} on {booking.FromDate:yyyy-MM-dd} has been cancelled by the admin.",
+                    RelatedBookingID = booking.BookingID,
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Notifications.Add(notif);
+                await _context.SaveChangesAsync();
+            }
 
             return Ok(new { message = "Booking cancelled successfully." });
         }

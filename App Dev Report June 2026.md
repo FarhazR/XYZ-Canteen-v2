@@ -121,47 +121,87 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 | CreatedByEmployeeID | INT (FK) | References Employees |
 | CreatedAt | DATETIME | UTC |
 
+### Announcements Table
+| Column | Type | Notes |
+|--------|------|-------|
+| AnnouncementID | INT (PK, Identity) | |
+| Title | NVARCHAR | |
+| Message | NVARCHAR (Nullable) | Optional |
+| PublishedBy | NVARCHAR | Username from JWT |
+| CreatedAt | DATETIME | UTC, auto-generated|
+
+### Notifications Table
+| Column | Type | Notes |
+|--------|------|-------|
+| NotificationID | INT (PK, Identity) | |
+| EmployeeID | INT (FK) | References Employees |
+| Title | NVARCHAR | |
+| Message | NVARCHAR | |
+| RelatedBookingID | INT (Nullable) | References Bookings |
+| IsRead | BIT | Default false |
+| CreatedAt | DATETIME | UTC, auto-generated |
+
+---
+
 ---
 
 ## Complete API Endpoint Reference
 
-### Authentication
+### Announcements
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| POST | /api/auth/login | Public | Login via Username + Password, returns JWT |
-| GET | /api/auth/me | Authenticated | Get current logged-in user info |
+| POST | /api/Announcements | Admin only | Publish a new announcement |
+| GET | /api/Announcements | Authenticated | Get all announcements, most recent first |
+| DELETE | /api/Announcements/{id} | Admin only | Remove an announcement |
 
-### Menu
+### Auth
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| GET | /api/menu | Authenticated | Full weekly menu grouped by day and meal type |
-| GET | /api/menu/{day} | Authenticated | Single day's menu (e.g. /api/menu/Monday) |
-| POST | /api/menu/admin/preview | Admin only | Preview Add/Update/Delete changes, returns summary and token |
-| POST | /api/menu/admin/confirm | Admin only | Apply previewed changes using confirmation token |
+| POST | /api/Auth/login | Public | Login via Username + Password, returns JWT |
+| GET | /api/Auth/me | Authenticated | Get current logged-in user info |
 
 ### Bookings
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| POST | /api/bookings | Authenticated | Place a new booking |
-| GET | /api/bookings | Admin only | View all bookings across all employees |
-| GET | /api/bookings/my | Authenticated | View own booking history |
-| GET | /api/bookings/{id} | Authenticated | View a specific booking (own only) |
-| PUT | /api/bookings/{id} | Authenticated | Modify a booking (own only, before cutoff) |
-| DELETE | /api/bookings/{id} | Authenticated | Cancel a booking (own only, before cutoff) |
+| GET | /api/Bookings | Admin only | View all bookings across all employees |
+| POST | /api/Bookings | Authenticated | Place a new booking |
+| GET | /api/Bookings/my | Authenticated | View own booking history |
+| GET | /api/Bookings/{id} | Authenticated | View a specific booking (own only) |
+| PUT | /api/Bookings/{id} | Authenticated | Modify a booking (own only, before cutoff) |
+| DELETE | /api/Bookings/{id} | Authenticated | Cancel a booking (own only, before cutoff); admin can cancel any booking and triggers a notification to the employee |
 
-### Today's Special
+### Menu
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| GET | /api/specials/today | Authenticated | Get specials active today |
-| GET | /api/specials | Authenticated | Get all published specials |
-| POST | /api/specials | Admin only | Publish a new special |
-| PUT | /api/specials/{id} | Admin only | Update a published special |
-| DELETE | /api/specials/{id} | Admin only | Remove a published special |
+| GET | /api/Menu | Authenticated | Full weekly menu grouped by day and meal type |
+| GET | /api/Menu/{day} | Authenticated | Single day's menu (e.g. /api/Menu/Monday) |
 
-### File Upload
+### MenuAdmin
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
-| POST | /api/upload/photo | Admin only | Upload image (jpg/png/webp, max 5MB), returns relative URL |
+| POST | /api/menu/admin/preview | Admin only | Preview Add/Update/Delete changes, returns summary and confirmation token |
+| POST | /api/menu/admin/confirm | Admin only | Apply previewed changes using confirmation token |
+
+### Notifications
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Notifications/my | Authenticated | Get own notifications, most recent first |
+| PUT | /api/Notifications/{id}/read | Authenticated | Mark a single notification as read |
+| PUT | /api/Notifications/mark-all-read | Authenticated | Mark all own notifications as read |
+
+### Specials
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Specials/today | Authenticated | Get specials active today |
+| GET | /api/Specials | Authenticated | Get all published specials |
+| POST | /api/Specials | Admin only | Publish a new special |
+| PUT | /api/Specials/{id} | Admin only | Update a published special |
+| DELETE | /api/Specials/{id} | Admin only | Remove a published special |
+
+### Upload
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/Upload/photo | Admin only | Upload image (jpg/png/webp, max 5MB), returns relative URL |
 
 ---
 
@@ -297,25 +337,31 @@ Share the new Forwarding URL with the frontend team after each restart.
 ```
 CanteenAPI/
 ├── Controllers/
+    ├── AnnouncementsController.cs
 │   ├── AuthController.cs
 │   ├── BookingsController.cs
 │   ├── MenuController.cs
 │   ├── MenuAdminController.cs
+    ├── NotificationsController.cs
 │   ├── SpecialsController.cs
 │   └── UploadController.cs
 ├── Data/
 │   ├── AppDbContext.cs
 │   └── DbSeeder.cs
 ├── DTOs/
+    ├── AnnouncementDTOs.cs
 │   ├── AuthDTOs.cs
 │   ├── BookingDTOs.cs
 │   ├── MenuDTOs.cs
+    ├── NotificationDTOs.cs
 │   └── SpecialDTOs.cs
 ├── Migrations/
 ├── Models/
+    ├── Announcement.cs
 │   ├── Booking.cs
 │   ├── Employee.cs
 │   ├── MenuItem.cs
+    ├── Notification.cs
 │   └── TodaysSpecial.cs
 ├── Properties/
 │   └── launchSettings.json
@@ -336,7 +382,7 @@ CanteenAPI/
 
 ### Pending — IT Integration
 - Production SQL Server connection (server address and credentials pending from IT)
-- Employee table integration — Option B selected (use existing organization employee table directly); requires IT to share production table schema and password hashing method used by existing system
+- Employee table integration — (use existing organization employee table directly); requires IT to share production table schema used by existing system
 - Network firewall rules between backend server and production database server
 
 ### Pending — Future Enhancements

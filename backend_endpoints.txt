@@ -1,43 +1,64 @@
-BASE URL: http://[backend-ip]:[port]/api
+## Complete API Endpoint Reference
 
-═══════════════════════════════════════
-AUTHENTICATION
-═══════════════════════════════════════
-POST   /api/Auth/login              Public           Login, returns JWT token
-GET    /api/Auth/me                 Authenticated     Get current user info
+### Announcements
 
-═══════════════════════════════════════
-MENU (READ)
-═══════════════════════════════════════
-GET    /api/Menu                    Authenticated     Full weekly menu, grouped by day → meal type
-GET    /api/Menu/{day}              Authenticated     Single day's menu (e.g. /api/menu/Monday)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/Announcements | Admin only | Publish a new announcement |
+| GET | /api/Announcements | Authenticated | Get all announcements, most recent first |
+| DELETE | /api/Announcements/{id} | Admin only | Remove an announcement |
 
-═══════════════════════════════════════
-MENU (ADMIN MANAGEMENT)
-═══════════════════════════════════════
-POST   /api/menu/admin/preview      Admin only        Submit Add/Update/Delete changes, get summary + token
-POST   /api/menu/admin/confirm      Admin only        Apply previewed changes using the token
+### Auth
 
-═══════════════════════════════════════
-BOOKINGS
-═══════════════════════════════════════
-POST   /api/Bookings                Authenticated     Place a new booking
-GET    /api/Bookings                Admin only        View all bookings (all employees)
-GET    /api/Bookings/my             Authenticated     View own bookings
-GET    /api/Bookings/{id}           Authenticated     View a specific booking (own only)
-PUT    /api/Bookings/{id}           Authenticated     Modify a booking (own only, before cutoff)
-DELETE /api/Bookings/{id}           Authenticated     Cancel a booking (own only, before cutoff)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/Auth/login | Public | Login via Username + Password, returns JWT |
+| GET | /api/Auth/me | Authenticated | Get current logged-in user info |
 
-═══════════════════════════════════════
-TODAY'S SPECIAL
-═══════════════════════════════════════
-GET    /api/Specials/today          Authenticated     Specials active today
-GET    /api/Specials                Authenticated     All published specials
-POST   /api/Specials                Admin only        Publish a new special
-PUT    /api/Specials/{id}           Admin only        Update a special
-DELETE /api/Specials/{id}           Admin only        Remove a special
+### Bookings
 
-═══════════════════════════════════════
-FILE UPLOAD
-═══════════════════════════════════════
-POST   /api/Upload/photo            Admin only        Upload an image, returns relative photoUrl
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Bookings | Admin only | View all bookings across all employees |
+| POST | /api/Bookings | Authenticated | Place a new booking |
+| GET | /api/Bookings/my | Authenticated | View own booking history |
+| GET | /api/Bookings/{id} | Authenticated | View a specific booking (own only) |
+| PUT | /api/Bookings/{id} | Authenticated | Modify a booking (own only, before cutoff) |
+| DELETE | /api/Bookings/{id} | Authenticated | Cancel a booking (own only, before cutoff); admin can cancel any booking and triggers a notification to the employee |
+
+### Menu
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Menu | Authenticated | Full weekly menu grouped by day and meal type |
+| GET | /api/Menu/{day} | Authenticated | Single day's menu (e.g. /api/Menu/Monday) |
+
+### MenuAdmin
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/menu/admin/preview | Admin only | Preview Add/Update/Delete changes, returns summary and confirmation token |
+| POST | /api/menu/admin/confirm | Admin only | Apply previewed changes using confirmation token |
+
+### Notifications
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Notifications/my | Authenticated | Get own notifications, most recent first |
+| PUT | /api/Notifications/{id}/read | Authenticated | Mark a single notification as read |
+| PUT | /api/Notifications/mark-all-read | Authenticated | Mark all own notifications as read |
+
+### Specials
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | /api/Specials/today | Authenticated | Get specials active today |
+| GET | /api/Specials | Authenticated | Get all published specials |
+| POST | /api/Specials | Admin only | Publish a new special |
+| PUT | /api/Specials/{id} | Admin only | Update a published special |
+| DELETE | /api/Specials/{id} | Admin only | Remove a published special |
+
+### Upload
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/Upload/photo | Admin only | Upload image (jpg/png/webp, max 5MB), returns relative URL |
