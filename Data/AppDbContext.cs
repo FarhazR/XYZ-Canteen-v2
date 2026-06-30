@@ -11,5 +11,6 @@ namespace CanteenAPI.Data
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<TodaysSpecial> TodaysSpecials { get; set; }
         public DbSet<MenuItem> MenuItems { get; set; }
+        public DbSet<Announcement> Announcements { get; set; }
     }
 }
