@@ -203,6 +203,11 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 |--------|----------|--------|-------------|
 | POST | /api/Upload/photo | Admin only | Upload image (jpg/png/webp, max 5MB), returns relative URL |
 
+### Users
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | /api/UsersAdmin | onlyCreate a new user account (Employee or Admin) |
+
 ---
 
 ## Validation Rules
@@ -232,6 +237,15 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 ### Login
 - Username (string, case-insensitive) must be provided
 - Password is required in all cases
+
+### User Creation
+
+Name, Username, Password, Department, and Phone are all required
+Role must be either Employee or Admin
+Username must be unique (case-insensitive)
+Username is stored in lowercase
+Password is BCrypt hashed before storage
+No self-registration — admin access required
 
 ---
 
@@ -344,7 +358,8 @@ CanteenAPI/
 │   ├── MenuAdminController.cs
     ├── NotificationsController.cs
 │   ├── SpecialsController.cs
-│   └── UploadController.cs
+│   ├── UploadController.cs
+    └── UsersController.cs
 ├── Data/
 │   ├── AppDbContext.cs
 │   └── DbSeeder.cs
@@ -354,7 +369,8 @@ CanteenAPI/
 │   ├── BookingDTOs.cs
 │   ├── MenuDTOs.cs
     ├── NotificationDTOs.cs
-│   └── SpecialDTOs.cs
+│   ├── SpecialDTOs.cs
+    └── UserDTOs.cs
 ├── Migrations/
 ├── Models/
     ├── Announcement.cs
