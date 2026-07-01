@@ -4,6 +4,7 @@ using CanteenAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace CanteenAPI.Controllers
 {
@@ -55,6 +56,7 @@ namespace CanteenAPI.Controllers
         public IActionResult GetAll()
         {
             var bookings = _context.Bookings
+                .Include(b => b.Employee)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
                 .Select(b => new BookingResponse
@@ -90,6 +92,7 @@ namespace CanteenAPI.Controllers
             var employeeID = GetCurrentEmployeeID();
 
             var bookings = _context.Bookings
+                .Include(b => b.Employee)
                 .Where(b => b.EmployeeID == employeeID)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
@@ -126,6 +129,7 @@ namespace CanteenAPI.Controllers
             var employeeID = GetCurrentEmployeeID();
 
             var booking = _context.Bookings
+                .Include(b => b.Employee)
                 .Where(b => b.BookingID == id && b.EmployeeID == employeeID)
                 .FirstOrDefault();
 
