@@ -19,5 +19,8 @@ namespace CanteenAPI.Models
 
         // Navigation property
         public Employee? Employee { get; set; }
+
+        public bool IsCollected { get; set; } = false;
+        public DateTime? CollectedAt { get; set; }
     }
 }

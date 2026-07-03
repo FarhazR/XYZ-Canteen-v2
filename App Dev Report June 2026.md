@@ -96,6 +96,8 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 | IsSpecialMeal | BIT | True if Today's Special selected |
 | Status | NVARCHAR | Confirmed or Cancelled |
 | CreatedAt | DATETIME | UTC |
+| IsCollected | BIT | Default false |
+| CollectedAt | DATETIME (Nullable) | UTC, set when marked as collected |
 
 ### MenuItems Table
 | Column | Type | Notes |
@@ -107,6 +109,14 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 | Description | NVARCHAR | |
 | PhotoUrl | NVARCHAR (Nullable) | Relative path or null |
 | DisplayOrder | INT | Preserves item order within each slot |
+
+### MealPricing Table
+| Column | Type | Notes |
+| MealPricingID | INT (PK, Identity) | |
+| MealType | NVARCHAR | Breakfast/Lunch/Evening Snacks/Dinner |
+| BaseCost | DECIMAL | Base cost per person |
+| PaneerSurcharge | DECIMAL | Additional cost for paneer |
+| NonVegSurcharge | DECIMAL | Additional cost for non-veg |
 
 ### TodaysSpecials Table
 | Column | Type | Notes |
@@ -169,6 +179,13 @@ ngrok configured to expose local backend over HTTPS for remote frontend integrat
 | GET | /api/Bookings/{id} | Authenticated | View a specific booking (own only) |
 | PUT | /api/Bookings/{id} | Authenticated | Modify a booking (own only, before cutoff) |
 | DELETE | /api/Bookings/{id} | Authenticated | Cancel a booking (own only, before cutoff); admin can cancel any booking and triggers a notification to the employee |
+| PUT | /api/Bookings/{id}/collect | Admin only | Mark a booking as collected |
+| PUT | /api/Bookings/{id}/uncollect | Admin only | Undo a collection mark
+
+### MealPricing
+| Method | Endpoint | Access | Description |
+| GET | /api/MealPricing | Authenticated | Get current pricing for all meal types
+| PUT | /api/MealPricing | Admin only | Update pricing for one or more meal types
 
 ### Menu
 | Method | Endpoint | Access | Description |
@@ -299,6 +316,13 @@ Cutoff enforcement uses the server machine's local system clock. Server timezone
 | 2 | Priya Sharma | priya.sharma | Employee | employee123 |
 | 3 | Amit Das | amit.das | Employee | employee123 |
 
+### Pricing Values
+| MealType | BaseCost | PaneerSurcharge | NonVegSurcharge |
+| Breakfast| 30 | 0 | 0 |
+| Lunch | 45 | 25 | 25 |
+| Evening Snacks | 30 | 0 | 0 |
+| Dinner | 45 | 25 | 25 |
+
 ### Menu Items
 28 items seeded across 7 days × 4 meal types, each with a `DisplayOrder` field preserving sequence within each meal slot. Items include realistic Indian canteen meals — Idli, Sambar, Poha, Rice, Dal, Roti, various curries, snacks, and desserts.
 
@@ -354,6 +378,7 @@ CanteenAPI/
     ├── AnnouncementsController.cs
 │   ├── AuthController.cs
 │   ├── BookingsController.cs
+    ├── MealPricingController.cs
 │   ├── MenuController.cs
 │   ├── MenuAdminController.cs
     ├── NotificationsController.cs
@@ -367,6 +392,7 @@ CanteenAPI/
     ├── AnnouncementDTOs.cs
 │   ├── AuthDTOs.cs
 │   ├── BookingDTOs.cs
+    ├── MealPricingDTOs.cs
 │   ├── MenuDTOs.cs
     ├── NotificationDTOs.cs
 │   ├── SpecialDTOs.cs
@@ -376,6 +402,7 @@ CanteenAPI/
     ├── Announcement.cs
 │   ├── Booking.cs
 │   ├── Employee.cs
+    ├── MealPricing.cs
 │   ├── MenuItem.cs
     ├── Notification.cs
 │   └── TodaysSpecial.cs

@@ -33,6 +33,24 @@ namespace CanteenAPI.Controllers
             "Central Canteen", "Administrative Building", "Central Control Room", "Central Workshop"
         };
 
+        private decimal CalculateTotalCost(Booking booking, List<MealPricing> pricingList)
+        {
+            var pricing = pricingList.FirstOrDefault(p => p.MealType == booking.MealType);
+
+            if (pricing == null) return 0;
+
+            var vegCost = booking.VegCount * pricing.BaseCost;
+            var paneerCost = booking.PaneerCount * (pricing.BaseCost + pricing.PaneerSurcharge);
+            var nonVegCost = booking.NonVegCount * (pricing.BaseCost + pricing.NonVegSurcharge);
+
+            // Breakfast and Evening Snacks have no veg/paneer/nonveg counts
+            // so all three will be 0 — fall back to base cost × headcount
+            var headCount = booking.BookingFor == "Guests" ? (booking.GuestCount ?? 1) : 1;
+            var subtotal = vegCost + paneerCost + nonVegCost;
+
+            return subtotal > 0 ? subtotal : pricing.BaseCost * headCount;
+        }
+        
         public BookingsController(AppDbContext context)
         {
             _context = context;
@@ -55,6 +73,8 @@ namespace CanteenAPI.Controllers
         [Authorize(Roles = "Admin")]
         public IActionResult GetAll()
         {
+            var pricingList = _context.MealPricing.ToList();
+            
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
                 .OrderByDescending(b => b.FromDate)
@@ -76,9 +96,13 @@ namespace CanteenAPI.Controllers
                     IsSpecialMeal = b.IsSpecialMeal,
                     Status = b.Status,
                     CreatedAt = b.CreatedAt,
+                    IsCollected = b.IsCollected,
+                    CollectedAt = b.CollectedAt,
+                    TotalCost = CalculateTotalCost(b, pricingList),
                     CanModify = b.Status == "Confirmed" &&
                                 b.FromDate.Date >= DateTime.Today &&
                                 !IsPastCutoff(b.FromDate, b.MealType)
+                    
                 })
                 .ToList();
 
@@ -90,6 +114,8 @@ namespace CanteenAPI.Controllers
         public IActionResult GetMyBookings()
         {
             var employeeID = GetCurrentEmployeeID();
+
+            var pricingList = _context.MealPricing.ToList();
 
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
@@ -113,12 +139,16 @@ namespace CanteenAPI.Controllers
                     IsSpecialMeal = b.IsSpecialMeal,
                     Status = b.Status,
                     CreatedAt = b.CreatedAt,
+                    IsCollected = b.IsCollected,
+                    CollectedAt = b.CollectedAt,
+                    TotalCost = CalculateTotalCost(b, pricingList),
                     CanModify = b.Status == "Confirmed" &&
                                 b.FromDate.Date >= DateTime.Today &&
                                 !IsPastCutoff(b.FromDate, b.MealType)
+                    
                 })
                 .ToList();
-
+            
             return Ok(bookings);
         }
 
@@ -128,6 +158,8 @@ namespace CanteenAPI.Controllers
         {
             var employeeID = GetCurrentEmployeeID();
 
+            var pricingList = _context.MealPricing.ToList();
+            
             var booking = _context.Bookings
                 .Include(b => b.Employee)
                 .Where(b => b.BookingID == id && b.EmployeeID == employeeID)
@@ -153,9 +185,13 @@ namespace CanteenAPI.Controllers
                 IsSpecialMeal = booking.IsSpecialMeal,
                 Status = booking.Status,
                 CreatedAt = booking.CreatedAt,
+                IsCollected = booking.IsCollected,
+                CollectedAt = booking.CollectedAt,
+                TotalCost = CalculateTotalCost(booking, pricingList),
                 CanModify = booking.Status == "Confirmed" &&
                             booking.FromDate.Date >= DateTime.Today &&
                             !IsPastCutoff(booking.FromDate, booking.MealType)
+                
             });
         }
 
@@ -337,6 +373,43 @@ namespace CanteenAPI.Controllers
             }
 
             return Ok(new { message = "Booking cancelled successfully." });
+        }
+
+        // PUT /api/Bookings/{id}/collect
+        [HttpPut("{id}/collect")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult Collect(int id)
+        {
+            var booking = _context.Bookings.FirstOrDefault(b => b.BookingID == id);
+
+            if (booking == null)
+                return NotFound(new { message = "Booking not found." });
+
+            if (booking.Status == "Cancelled")
+                return BadRequest(new { message = "Cannot mark a cancelled booking as collected." });
+
+            booking.IsCollected = true;
+            booking.CollectedAt = DateTime.UtcNow;
+            _context.SaveChanges();
+
+            return Ok(new { message = "Marked as collected." });
+        }
+
+        // PUT /api/Bookings/{id}/uncollect
+        [HttpPut("{id}/uncollect")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult Uncollect(int id)
+        {
+            var booking = _context.Bookings.FirstOrDefault(b => b.BookingID == id);
+
+            if (booking == null)
+                return NotFound(new { message = "Booking not found." });
+
+            booking.IsCollected = false;
+            booking.CollectedAt = null;
+            _context.SaveChanges();
+
+            return Ok(new { message = "Marked as not collected." });
         }
     }
 }

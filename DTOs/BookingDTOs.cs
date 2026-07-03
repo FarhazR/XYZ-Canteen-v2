@@ -46,5 +46,8 @@ namespace CanteenAPI.DTOs
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public bool CanModify { get; set; }
+        public bool IsCollected { get; set; }
+        public DateTime? CollectedAt { get; set; }
+        public decimal TotalCost { get; set; }
     }
 }
