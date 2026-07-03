@@ -4,6 +4,7 @@ using CanteenAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CanteenAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260630091221_AddAnnouncementsTable")]
+    partial class AddAnnouncementsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -66,9 +69,6 @@ namespace CanteenAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("CollectedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -80,9 +80,6 @@ namespace CanteenAPI.Migrations
 
                     b.Property<int?>("GuestCount")
                         .HasColumnType("int");
-
-                    b.Property<bool>("IsCollected")
-                        .HasColumnType("bit");
 
                     b.Property<bool>("IsSpecialMeal")
                         .HasColumnType("bit");
@@ -151,32 +148,6 @@ namespace CanteenAPI.Migrations
                     b.ToTable("Employees");
                 });
 
-            modelBuilder.Entity("CanteenAPI.Models.MealPricing", b =>
-                {
-                    b.Property<int>("MealPricingID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MealPricingID"));
-
-                    b.Property<decimal>("BaseCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("MealType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("NonVegSurcharge")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("PaneerSurcharge")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("MealPricingID");
-
-                    b.ToTable("MealPricing");
-                });
-
             modelBuilder.Entity("CanteenAPI.Models.MenuItem", b =>
                 {
                     b.Property<int>("MenuItemID")
@@ -210,41 +181,6 @@ namespace CanteenAPI.Migrations
                     b.HasKey("MenuItemID");
 
                     b.ToTable("MenuItems");
-                });
-
-            modelBuilder.Entity("CanteenAPI.Models.Notification", b =>
-                {
-                    b.Property<int>("NotificationID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationID"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EmployeeID")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("RelatedBookingID")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("NotificationID");
-
-                    b.HasIndex("EmployeeID");
-
-                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("CanteenAPI.Models.TodaysSpecial", b =>
@@ -290,17 +226,6 @@ namespace CanteenAPI.Migrations
                 });
 
             modelBuilder.Entity("CanteenAPI.Models.Booking", b =>
-                {
-                    b.HasOne("CanteenAPI.Models.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-                });
-
-            modelBuilder.Entity("CanteenAPI.Models.Notification", b =>
                 {
                     b.HasOne("CanteenAPI.Models.Employee", "Employee")
                         .WithMany()

@@ -13,7 +13,8 @@ namespace CanteenAPI.Data
             {
                 new Employee
                 {
-                    Name = "Rajesh Kumar",
+                    Name = "Farhaz Rahman",
+                    Username = "farhaz.rahman",
                     Department = "Engineering",
                     Phone = "9876543210",
                     Role = "Admin",
@@ -22,6 +23,7 @@ namespace CanteenAPI.Data
                 new Employee
                 {
                     Name = "Priya Sharma",
+                    Username = "priya.sharma",
                     Department = "HR",
                     Phone = "9876543211",
                     Role = "Employee",
@@ -30,6 +32,7 @@ namespace CanteenAPI.Data
                 new Employee
                 {
                     Name = "Amit Das",
+                    Username = "amit.das",
                     Department = "Finance",
                     Phone = "9876543212",
                     Role = "Employee",
