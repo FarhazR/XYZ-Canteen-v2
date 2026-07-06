@@ -56,9 +56,14 @@ namespace CanteenAPI.Controllers
             _context = context;
         }
 
-        private int GetCurrentEmployeeID()
+        private int GetCurrentUserID()
         {
             return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        }
+
+        private string GetCurrentUserType()
+        {
+            return User.FindFirst("UserType")?.Value ?? "Employee";
         }
 
         private static bool IsPastCutoff(DateTime date, string mealType)
@@ -77,12 +82,14 @@ namespace CanteenAPI.Controllers
             
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
+                .Include(b => b.NewUser)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
                 .Select(b => new BookingResponse
                 {
                     BookingID = b.BookingID,
                     EmployeeID = b.EmployeeID,
+                    NewUserID = b.NewUserID,
                     EmployeeName = b.Employee != null ? b.Employee.Name : string.Empty,
                     FromDate = b.FromDate,
                     ToDate = b.ToDate,
@@ -113,20 +120,24 @@ namespace CanteenAPI.Controllers
         [HttpGet("my")]
         public IActionResult GetMyBookings()
         {
-            var employeeID = GetCurrentEmployeeID();
+            var employeeID = GetCurrentUserID();
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var pricingList = _context.MealPricing.ToList();
 
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
-                .Where(b => b.EmployeeID == employeeID)
+                .Include(b => b.NewUser)
+                .Where(b => userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
                 .Select(b => new BookingResponse
                 {
                     BookingID = b.BookingID,
                     EmployeeID = b.EmployeeID,
-                    EmployeeName = b.Employee != null ? b.Employee.Name : string.Empty,
+                    NewUserID = b.NewUserID,
+                    EmployeeName = b.Employee != null ? b.Employee.Name : b.NewUser != null ? b.NewUser.Name : string.Empty,
                     FromDate = b.FromDate,
                     ToDate = b.ToDate,
                     CanteenLocation = b.CanteenLocation,
@@ -156,13 +167,15 @@ namespace CanteenAPI.Controllers
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
-            var employeeID = GetCurrentEmployeeID();
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var pricingList = _context.MealPricing.ToList();
             
             var booking = _context.Bookings
                 .Include(b => b.Employee)
-                .Where(b => b.BookingID == id && b.EmployeeID == employeeID)
+                .Include(b => b.NewUser)
+                .Where(b => b.BookingID == id && (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID))
                 .FirstOrDefault();
 
             if (booking == null)
@@ -172,7 +185,9 @@ namespace CanteenAPI.Controllers
             {
                 BookingID = booking.BookingID,
                 EmployeeID = booking.EmployeeID,
-                EmployeeName = booking.Employee != null ? booking.Employee.Name : string.Empty,
+                NewUserID = booking.NewUserID,
+                EmployeeName = booking.Employee != null ? booking.Employee.Name: booking.NewUser != null ? booking.NewUser.Name : string.Empty,
+
                 FromDate = booking.FromDate,
                 ToDate = booking.ToDate,
                 CanteenLocation = booking.CanteenLocation,
@@ -199,7 +214,8 @@ namespace CanteenAPI.Controllers
         [HttpPost]
         public IActionResult Create([FromBody] CreateBookingRequest request)
         {
-            var employeeID = GetCurrentEmployeeID();
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             // Validate meal type
             if (!ValidMealTypes.Contains(request.MealType))
@@ -267,7 +283,8 @@ namespace CanteenAPI.Controllers
 
             var booking = new Booking
             {
-                EmployeeID = employeeID,
+                EmployeeID = userType == "Employee" ? userID : null,
+                NewUserID = userType == "NewUser" ? userID : null,
                 FromDate = request.FromDate.Date,
                 ToDate = request.ToDate.Date,
                 CanteenLocation = request.CanteenLocation,
@@ -293,10 +310,11 @@ namespace CanteenAPI.Controllers
         [HttpPut("{id}")]
         public IActionResult Update(int id, [FromBody] UpdateBookingRequest request)
         {
-            var employeeID = GetCurrentEmployeeID();
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var booking = _context.Bookings
-                .FirstOrDefault(b => b.BookingID == id && b.EmployeeID == employeeID);
+                .FirstOrDefault(b => b.BookingID == id && (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID));
 
             if (booking == null)
                 return NotFound(new { message = "Booking not found." });
@@ -333,7 +351,8 @@ namespace CanteenAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Cancel(int id)
         {
-            var employeeID = GetCurrentEmployeeID();
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var booking = _context.Bookings
                 .FirstOrDefault(b => b.BookingID == id);
@@ -342,9 +361,10 @@ namespace CanteenAPI.Controllers
                 return NotFound(new { message = "Booking not found." });
 
             var isAdmin = User.IsInRole("Admin");
-            var isOwnBooking = booking.EmployeeID == employeeID;
+            var isOwnBooking = userType == "Employee"
+                ? booking.EmployeeID == userID
+                : booking.NewUserID == userID;
 
-            // Employees can only cancel their own bookings
             if (!isAdmin && !isOwnBooking)
                 return NotFound(new { message = "Booking not found." });
 
@@ -362,6 +382,7 @@ namespace CanteenAPI.Controllers
                 var notif = new Notification
                 {
                     EmployeeID = booking.EmployeeID,
+                    NewUserID = booking.NewUserID,
                     Title = "Booking Cancelled",
                     Message = $"Your booking #{booking.BookingID} for {booking.MealType} on {booking.FromDate:yyyy-MM-dd} has been cancelled by the admin.",
                     RelatedBookingID = booking.BookingID,

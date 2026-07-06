@@ -7,7 +7,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-
 namespace CanteenAPI.Controllers
 {
     [ApiController]
@@ -30,33 +29,65 @@ namespace CanteenAPI.Controllers
             if (string.IsNullOrEmpty(request.Username))
                 return BadRequest(new { message = "Please provide a username." });
 
-            Models.Employee? employee = null;
+            var username = request.Username.ToLower().Trim();
 
-            if (!string.IsNullOrEmpty(request.Username))
+            // Check IT's Employee table first
+            var employee = _context.Employees
+                .FirstOrDefault(e => e.username == username);
+
+            if (employee != null)
             {
-                employee = _context.Employees
-                    .FirstOrDefault(e => e.Username == request.Username.ToLower().Trim());
+                // Enforce access restrictions
+                if (employee.empState != 3)
+                    return Unauthorized(new { message = "Account is not active." });
+
+                if (employee.isConnectLock == 1)
+                    return Unauthorized(new { message = "Account is locked." });
+
+                if (!BCrypt.Net.BCrypt.Verify(request.Password, employee.password))
+                    return Unauthorized(new { message = "Invalid credentials." });
+
+                var token = GenerateTokenForEmployee(employee);
+
+                return Ok(new LoginResponse
+                {
+                    Token = token,
+                    EmployeeID = employee.ID,
+                    Name = employee.Name,
+                    Username = employee.username,
+                    Department = employee.Department ?? string.Empty,
+                    Role = "Employee",
+                    UserType = "Employee"
+                });
             }
 
-            if (employee == null)
-                return Unauthorized(new { message = "Invalid credentials." });
+            // Check NewUsers table
+            var newUser = _context.NewUsers
+                .FirstOrDefault(u => u.Username == username);
 
-            bool validPassword = BCrypt.Net.BCrypt.Verify(request.Password, employee.PasswordHash);
-
-            if (!validPassword)
-                return Unauthorized(new { message = "Invalid credentials." });
-
-            var token = GenerateToken(employee);
-
-            return Ok(new LoginResponse
+            if (newUser != null)
             {
-                Token = token,
-                EmployeeID = employee.EmployeeID,
-                Name = employee.Name,
-                Username = employee.Username,
-                Department = employee.Department,
-                Role = employee.Role
-            });
+                if (newUser.IsLocked)
+                    return Unauthorized(new { message = "Account is locked." });
+
+                if (!BCrypt.Net.BCrypt.Verify(request.Password, newUser.PasswordHash))
+                    return Unauthorized(new { message = "Invalid credentials." });
+
+                var token = GenerateTokenForNewUser(newUser);
+
+                return Ok(new LoginResponse
+                {
+                    Token = token,
+                    EmployeeID = newUser.ID,
+                    Name = newUser.Name,
+                    Username = newUser.Username,
+                    Department = newUser.Department ?? string.Empty,
+                    Role = newUser.Role,
+                    UserType = "NewUser"
+                });
+            }
+
+            return Unauthorized(new { message = "Invalid credentials." });
         }
 
         // GET api/auth/me
@@ -64,37 +95,72 @@ namespace CanteenAPI.Controllers
         [Authorize]
         public IActionResult Me()
         {
-            var employeeIdClaim = User
-                .FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userTypeClaim = User.FindFirst("UserType")?.Value;
 
-            if (employeeIdClaim == null)
+            if (idClaim == null || userTypeClaim == null)
                 return Unauthorized();
 
-            var employee = _context.Employees
-                .FirstOrDefault(e => e.EmployeeID == int.Parse(employeeIdClaim));
+            var id = int.Parse(idClaim);
 
-            if (employee == null)
-                return NotFound();
-
-            return Ok(new LoginResponse
+            if (userTypeClaim == "Employee")
             {
-                EmployeeID = employee.EmployeeID,
-                Name = employee.Name,
-                Username = employee.Username,
-                Department = employee.Department,
-                Role = employee.Role
-            });
+                var employee = _context.Employees.FirstOrDefault(e => e.ID == id);
+                if (employee == null) return NotFound();
+
+                return Ok(new LoginResponse
+                {
+                    EmployeeID = employee.ID,
+                    Name = employee.Name,
+                    Username = employee.username,
+                    Department = employee.Department ?? string.Empty,
+                    Role = "Employee",
+                    UserType = "Employee"
+                });
+            }
+            else
+            {
+                var newUser = _context.NewUsers.FirstOrDefault(u => u.ID == id);
+                if (newUser == null) return NotFound();
+
+                return Ok(new LoginResponse
+                {
+                    EmployeeID = newUser.ID,
+                    Name = newUser.Name,
+                    Username = newUser.Username,
+                    Department = newUser.Department ?? string.Empty,
+                    Role = newUser.Role,
+                    UserType = "NewUser"
+                });
+            }
         }
 
-        private string GenerateToken(CanteenAPI.Models.Employee employee)
+        private string GenerateTokenForEmployee(CanteenAPI.Models.Employee employee)
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, employee.EmployeeID.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, employee.ID.ToString()),
                 new Claim(ClaimTypes.Name, employee.Name),
-                new Claim(ClaimTypes.Role, employee.Role)
+                new Claim(ClaimTypes.Role, "Employee"),
+                new Claim("UserType", "Employee")
             };
+            return BuildToken(claims);
+        }
 
+        private string GenerateTokenForNewUser(CanteenAPI.Models.NewUser newUser)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, newUser.ID.ToString()),
+                new Claim(ClaimTypes.Name, newUser.Name),
+                new Claim(ClaimTypes.Role, newUser.Role),
+                new Claim("UserType", "NewUser")
+            };
+            return BuildToken(claims);
+        }
+
+        private string BuildToken(Claim[] claims)
+        {
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

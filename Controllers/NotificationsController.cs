@@ -18,17 +18,24 @@ namespace CanteenAPI.Controllers
             _context = context;
         }
 
+        private int GetCurrentUserID() =>
+            int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        private string GetCurrentUserType() =>
+            User.FindFirst("UserType")?.Value ?? "Employee";
+
         // GET /api/Notifications/my
         [HttpGet("my")]
         [Authorize]
         public async Task<IActionResult> GetMy()
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (employeeIdClaim == null) return Unauthorized();
-            var employeeId = int.Parse(employeeIdClaim);
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var notifications = await _context.Notifications
-                .Where(n => n.EmployeeID == employeeId)
+                .Where(n => userType == "Employee"
+                    ? n.EmployeeID == userID
+                    : n.NewUserID == userID)
                 .OrderByDescending(n => n.CreatedAt)
                 .Select(n => new NotificationResponseDto
                 {
@@ -49,12 +56,14 @@ namespace CanteenAPI.Controllers
         [Authorize]
         public async Task<IActionResult> MarkAsRead(int id)
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (employeeIdClaim == null) return Unauthorized();
-            var employeeId = int.Parse(employeeIdClaim);
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var notification = await _context.Notifications
-                .FirstOrDefaultAsync(n => n.NotificationID == id && n.EmployeeID == employeeId);
+                .FirstOrDefaultAsync(n => n.NotificationID == id &&
+                    (userType == "Employee"
+                        ? n.EmployeeID == userID
+                        : n.NewUserID == userID));
 
             if (notification == null)
                 return NotFound(new { message = "Notification not found." });
@@ -70,12 +79,14 @@ namespace CanteenAPI.Controllers
         [Authorize]
         public async Task<IActionResult> MarkAllRead()
         {
-            var employeeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (employeeIdClaim == null) return Unauthorized();
-            var employeeId = int.Parse(employeeIdClaim);
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
 
             var unread = await _context.Notifications
-                .Where(n => n.EmployeeID == employeeId && !n.IsRead)
+                .Where(n => !n.IsRead &&
+                    (userType == "Employee"
+                        ? n.EmployeeID == userID
+                        : n.NewUserID == userID))
                 .ToListAsync();
 
             unread.ForEach(n => n.IsRead = true);
