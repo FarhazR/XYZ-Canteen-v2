@@ -1,3 +1,11 @@
+/*
+ * BCPL Canteen Management System
+ * This software is developed exclusively for use within BCPL.
+ * It is intended solely for official purposes and shall not be used,
+ * copied, or distributed without authorization. 
+ */
+
+
 using CanteenAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -71,6 +79,8 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.Logger.LogInformation( "This backend is developed exclusively for the XYZ PSU Canteen Management System and is intended solely for official use.");
 
 if (app.Environment.IsDevelopment())
 {
