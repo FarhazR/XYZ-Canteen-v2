@@ -15,5 +15,6 @@ namespace CanteenAPI.DTOs
         public string Name { get; set; } = string.Empty;
         public string Department { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
+        public string UserType { get; set; } = string.Empty;
     }
 }

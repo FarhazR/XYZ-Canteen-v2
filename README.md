@@ -1,4 +1,5 @@
-```markdown
+This backend application has been developed exclusively for BCPL Dibrugarh's Canteen Management System and is intended only for official use within BCPL.
+
 # Canteen Meal Booking System — Backend
 
 ASP.NET Core Web API backend for the PSU Canteen Meal Booking mobile application.
@@ -417,4 +418,4 @@ CanteenAPI/
 
 ---
 
-*Developed as part of PSU internship project, June 2026.*
+*Developed as part of PSU internship project, June-July 2026.*

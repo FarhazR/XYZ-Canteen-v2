@@ -31,7 +31,8 @@ namespace CanteenAPI.DTOs
     public class BookingResponse
     {
         public int BookingID { get; set; }
-        public int EmployeeID { get; set; }
+        public int? EmployeeID { get; set; }
+        public int? NewUserID { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }

@@ -6,41 +6,33 @@ namespace CanteenAPI.Data
     {
         public static void Seed(AppDbContext context)
         {
-            if (context.Employees.Any()) return;
-
-            // Employees
-            var employees = new List<Employee>
+            // Employee seeding removed — IT's Employee table owns that data
+            
+            // Seed default admin into NewUsers if none exists
+            if (!context.NewUsers.Any(u => u.Role == "Admin"))
             {
-                new Employee
+                var adminUser = new NewUser
                 {
                     Name = "Farhaz Rahman",
                     Username = "farhaz.rahman",
                     Department = "Engineering",
+                    UserType = "Intern",
                     Phone = "9876543210",
                     Role = "Admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123")
-                },
-                new Employee
-                {
-                    Name = "Priya Sharma",
-                    Username = "priya.sharma",
-                    Department = "HR",
-                    Phone = "9876543211",
-                    Role = "Employee",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("employee123")
-                },
-                new Employee
-                {
-                    Name = "Amit Das",
-                    Username = "amit.das",
-                    Department = "Finance",
-                    Phone = "9876543212",
-                    Role = "Employee",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("employee123")
-                }
-            };
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                    CreatedAt = DateTime.UtcNow,
+                    IsLocked = false
+                };
 
-            context.Employees.AddRange(employees);
+                context.NewUsers.Add(adminUser);
+                context.SaveChanges();
+            }
+
+            if (context.MenuItems.Any())
+            {
+                // Menu items already seeded, skip
+                return;
+            }
 
             // Weekly Menu Items
             var menuItems = new List<MenuItem>
