@@ -476,4 +476,4 @@ Add header: ngrok-skip-browser-warning: true
 
 *Developed as part of PSU Internship Project, June 2026.*
 *Backend: Farhaz Rahman*
-*Frontend: Grihshant Manas Dutta*
+*Frontend: Grihshant Manash Dutta*

@@ -90,7 +90,7 @@ namespace CanteenAPI.Controllers
                     BookingID = b.BookingID,
                     EmployeeID = b.EmployeeID,
                     NewUserID = b.NewUserID,
-                    EmployeeName = b.Employee != null ? b.Employee.Name : string.Empty,
+                    EmployeeName = b.Employee != null ? b.Employee.Name : b.NewUser != null ? b.NewUser.Name : string.Empty,
                     FromDate = b.FromDate,
                     ToDate = b.ToDate,
                     CanteenLocation = b.CanteenLocation,
