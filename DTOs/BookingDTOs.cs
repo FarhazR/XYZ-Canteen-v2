@@ -1,17 +1,27 @@
 namespace CanteenAPI.DTOs
 {
+    public class MealRequest
+    {
+        public string MealType { get; set; } = string.Empty;
+        public int VegCount { get; set; }
+        public int PaneerCount { get; set; }
+        public int NonVegCount { get; set; }
+        public bool IsSpecialMeal { get; set; } = false;
+    }
+
     public class CreateBookingRequest
     {
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }
         public string CanteenLocation { get; set; } = string.Empty;
-        public string MealType { get; set; } = string.Empty;
         public string BookingFor { get; set; } = "Self";
         public int? GuestCount { get; set; }
-        public int VegCount { get; set; }
-        public int PaneerCount { get; set; }
-        public int NonVegCount { get; set; }
-        public bool IsSpecialMeal { get; set; } = false;
+        public List<MealRequest> Meals { get; set; } = new();
+    }
+
+    public class UpdateBookingGroupRequest
+    {
+        public List<MealRequest> Meals { get; set; } = new();
     }
 
     public class UpdateBookingRequest
@@ -31,6 +41,7 @@ namespace CanteenAPI.DTOs
     public class BookingResponse
     {
         public int BookingID { get; set; }
+        public Guid BookingGroupID { get; set; }
         public int? EmployeeID { get; set; }
         public int? NewUserID { get; set; }
         public string EmployeeName { get; set; } = string.Empty;

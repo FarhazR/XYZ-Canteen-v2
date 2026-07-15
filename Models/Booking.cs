@@ -18,6 +18,8 @@ namespace CanteenAPI.Models
         public string Status { get; set; } = "Confirmed";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public Guid BookingGroupID { get; set; } = Guid.NewGuid();
+
         // Navigation property
         public Employee? Employee { get; set; }
         public NewUser? NewUser { get; set; }

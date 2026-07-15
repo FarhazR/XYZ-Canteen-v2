@@ -106,10 +106,8 @@ namespace CanteenAPI.Controllers
                     IsCollected = b.IsCollected,
                     CollectedAt = b.CollectedAt,
                     TotalCost = CalculateTotalCost(b, pricingList),
-                    CanModify = b.Status == "Confirmed" &&
-                                b.FromDate.Date >= DateTime.Today &&
-                                !IsPastCutoff(b.FromDate, b.MealType)
-                    
+                    BookingGroupID = b.BookingGroupID,
+                    CanModify = b.Status == "Confirmed" && b.FromDate.Date >= DateTime.Today && !IsPastCutoff(b.FromDate, b.MealType)
                 })
                 .ToList();
 
@@ -153,6 +151,7 @@ namespace CanteenAPI.Controllers
                     IsCollected = b.IsCollected,
                     CollectedAt = b.CollectedAt,
                     TotalCost = CalculateTotalCost(b, pricingList),
+                    BookingGroupID = b.BookingGroupID,
                     CanModify = b.Status == "Confirmed" &&
                                 b.FromDate.Date >= DateTime.Today &&
                                 !IsPastCutoff(b.FromDate, b.MealType)
@@ -203,6 +202,7 @@ namespace CanteenAPI.Controllers
                 IsCollected = booking.IsCollected,
                 CollectedAt = booking.CollectedAt,
                 TotalCost = CalculateTotalCost(booking, pricingList),
+                BookingGroupID = booking.BookingGroupID,
                 CanModify = booking.Status == "Confirmed" &&
                             booking.FromDate.Date >= DateTime.Today &&
                             !IsPastCutoff(booking.FromDate, booking.MealType)
@@ -216,10 +216,6 @@ namespace CanteenAPI.Controllers
         {
             var userID = GetCurrentUserID();
             var userType = GetCurrentUserType();
-
-            // Validate meal type
-            if (!ValidMealTypes.Contains(request.MealType))
-                return BadRequest(new { message = "Invalid meal type." });
 
             // Validate location
             if (!ValidLocations.Contains(request.CanteenLocation))
@@ -235,75 +231,148 @@ namespace CanteenAPI.Controllers
             if (request.FromDate.Date > DateTime.Today.AddDays(30))
                 return BadRequest(new { message = "Cannot book more than 30 days in advance." });
 
-            // Check cutoff
-            if (IsPastCutoff(request.FromDate, request.MealType))
-                return BadRequest(new { message = $"Booking cutoff time for {request.MealType} has passed." });
+            // Validate meals list
+            if (request.Meals == null || request.Meals.Count == 0)
+                return BadRequest(new { message = "At least one meal must be selected." });
+
+            // Validate no duplicate meal types in request
+            var mealTypes = request.Meals.Select(m => m.MealType).ToList();
+            if (mealTypes.Count != mealTypes.Distinct().Count())
+                return BadRequest(new { message = "Duplicate meal types in request." });
 
             // Validate guest booking
             if (request.BookingFor == "Guests" &&
                 (request.GuestCount == null || request.GuestCount <= 0))
                 return BadRequest(new { message = "Guest count is required for guest bookings." });
 
-            // Validate meal counts
-            if (!request.IsSpecialMeal)
+            // Validate each meal
+            var errors = new List<string>();
+
+            foreach (var meal in request.Meals)
             {
-                if (request.BookingFor == "Self")
+                if (!ValidMealTypes.Contains(meal.MealType))
                 {
-                    var totalCount = request.VegCount + request.PaneerCount + request.NonVegCount;
-                    if (totalCount == 0)
-                        return BadRequest(new { message = "Please select a meal category." });
-                    if (totalCount > 1)
-                        return BadRequest(new { message = "Self booking allows only one meal." });
+                    errors.Add($"{meal.MealType}: Invalid meal type.");
+                    continue;
                 }
 
-                if (request.BookingFor == "Guests")
+                // Check cutoff
+                if (IsPastCutoff(request.FromDate, meal.MealType))
                 {
-                    var totalMeals = request.VegCount + request.PaneerCount + request.NonVegCount;
-                    if (totalMeals == 0)
-                        return BadRequest(new { message = "Please enter meal counts for guests." });
-                    if (request.GuestCount.HasValue && totalMeals != request.GuestCount.Value)
-                        return BadRequest(new { message = "Total meal counts must equal number of guests." });
+                    errors.Add($"{meal.MealType}: Cutoff time has passed.");
+                    continue;
+                }
+
+                // Validate meal counts
+                if (!meal.IsSpecialMeal)
+                {
+                    if (request.BookingFor == "Self")
+                    {
+                        var totalCount = meal.VegCount + meal.PaneerCount + meal.NonVegCount;
+                        if (meal.MealType != "Breakfast" && meal.MealType != "Evening Snacks")
+                        {
+                            if (totalCount == 0)
+                                errors.Add($"{meal.MealType}: Please select a meal category.");
+                            else if (totalCount > 1)
+                                errors.Add($"{meal.MealType}: Self booking allows only one meal.");
+                        }
+                    }
+
+                    if (request.BookingFor == "Guests")
+                    {
+                        var totalMeals = meal.VegCount + meal.PaneerCount + meal.NonVegCount;
+                        if (meal.MealType != "Breakfast" && meal.MealType != "Evening Snacks")
+                        {
+                            if (totalMeals == 0)
+                                errors.Add($"{meal.MealType}: Please enter meal counts for guests.");
+                            else if (request.GuestCount.HasValue && totalMeals != request.GuestCount.Value)
+                                errors.Add($"{meal.MealType}: Total meal counts must equal number of guests.");
+                        }
+                    }
+                }
+
+                if (meal.IsSpecialMeal)
+                {
+                    if (meal.MealType != "Lunch" && meal.MealType != "Dinner")
+                        errors.Add($"{meal.MealType}: Today's Special is only available for Lunch and Dinner.");
+                    else
+                    {
+                        var specialExists = _context.TodaysSpecials
+                            .Any(s => s.Date.Date == request.FromDate.Date &&
+                                      s.MealType == meal.MealType &&
+                                      s.ApplicableOutlets.Contains(request.CanteenLocation));
+                        if (!specialExists)
+                            errors.Add($"{meal.MealType}: No Today's Special available for the selected date and outlet.");
+                    }
+                }
+
+                // Check duplicate booking for each date in range
+                var currentDate = request.FromDate.Date;
+                while (currentDate <= request.ToDate.Date)
+                {
+                    bool duplicateExists = userType == "Employee"
+                        ? _context.Bookings.Any(b =>
+                            b.EmployeeID == userID &&
+                            b.MealType == meal.MealType &&
+                            b.FromDate.Date <= currentDate &&
+                            b.ToDate.Date >= currentDate &&
+                            b.Status == "Confirmed")
+                        : _context.Bookings.Any(b =>
+                            b.NewUserID == userID &&
+                            b.MealType == meal.MealType &&
+                            b.FromDate.Date <= currentDate &&
+                            b.ToDate.Date >= currentDate &&
+                            b.Status == "Confirmed");
+
+                    if (duplicateExists)
+                    {
+                        errors.Add($"{meal.MealType}: Already have a booking for {currentDate:yyyy-MM-dd}.");
+                        break;
+                    }
+                    currentDate = currentDate.AddDays(1);
                 }
             }
 
-            // Validate Today's Special if selected
-            if (request.IsSpecialMeal)
+            if (errors.Count > 0)
+                return BadRequest(new { message = "Booking failed due to the following errors.", errors });
+
+            // All validations passed — create bookings
+            var groupID = Guid.NewGuid();
+            var pricingList = _context.MealPricing.ToList();
+            var createdBookings = new List<int>();
+
+            foreach (var meal in request.Meals)
             {
-                if (request.MealType != "Lunch" && request.MealType != "Dinner")
-                    return BadRequest(new { message = "Today's Special is only available for Lunch and Dinner." });
+                var booking = new Booking
+                {
+                    BookingGroupID = groupID,
+                    EmployeeID = userType == "Employee" ? userID : null,
+                    NewUserID = userType == "NewUser" ? userID : null,
+                    FromDate = request.FromDate.Date,
+                    ToDate = request.ToDate.Date,
+                    CanteenLocation = request.CanteenLocation,
+                    MealType = meal.MealType,
+                    BookingFor = request.BookingFor,
+                    GuestCount = request.BookingFor == "Guests" ? request.GuestCount : null,
+                    VegCount = meal.VegCount,
+                    PaneerCount = meal.PaneerCount,
+                    NonVegCount = meal.NonVegCount,
+                    IsSpecialMeal = meal.IsSpecialMeal,
+                    Status = "Confirmed",
+                    CreatedAt = DateTime.UtcNow
+                };
 
-                var specialExists = _context.TodaysSpecials
-                    .Any(s => s.Date.Date == request.FromDate.Date &&
-                              s.MealType == request.MealType &&
-                              s.ApplicableOutlets.Contains(request.CanteenLocation));
-
-                if (!specialExists)
-                    return BadRequest(new { message = "No Today's Special is available for the selected date, meal type, and outlet." });
+                _context.Bookings.Add(booking);
+                _context.SaveChanges();
+                createdBookings.Add(booking.BookingID);
             }
 
-            var booking = new Booking
+            return Ok(new
             {
-                EmployeeID = userType == "Employee" ? userID : null,
-                NewUserID = userType == "NewUser" ? userID : null,
-                FromDate = request.FromDate.Date,
-                ToDate = request.ToDate.Date,
-                CanteenLocation = request.CanteenLocation,
-                MealType = request.MealType,
-                BookingFor = request.BookingFor,
-                GuestCount = request.BookingFor == "Guests" ? request.GuestCount : null,
-                VegCount = request.VegCount,
-                PaneerCount = request.PaneerCount,
-                NonVegCount = request.NonVegCount,
-                IsSpecialMeal = request.IsSpecialMeal,
-                Status = "Confirmed",
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Bookings.Add(booking);
-            _context.SaveChanges();
-
-            return CreatedAtAction(nameof(GetById), new { id = booking.BookingID },
-                new { message = "Booking confirmed.", bookingID = booking.BookingID });
+                message = "Booking confirmed.",
+                bookingGroupID = groupID,
+                bookingIDs = createdBookings
+            });
         }
 
         // PUT api/bookings/{id}
@@ -345,6 +414,71 @@ namespace CanteenAPI.Controllers
             _context.SaveChanges();
 
             return Ok(new { message = "Booking updated successfully.", bookingID = booking.BookingID });
+        }
+
+        // PUT api/bookings/group/{groupId}
+        [HttpPut("group/{groupId}")]
+        public IActionResult UpdateGroup(Guid groupId, [FromBody] UpdateBookingGroupRequest request)
+        {
+            var userID = GetCurrentUserID();
+            var userType = GetCurrentUserType();
+
+            // Get all confirmed bookings in this group belonging to this user
+            var groupBookings = _context.Bookings
+                .Where(b => b.BookingGroupID == groupId &&
+                    b.Status == "Confirmed" &&
+                    (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID))
+                .ToList();
+
+            if (!groupBookings.Any())
+                return NotFound(new { message = "Booking group not found." });
+
+            var errors = new List<string>();
+            var mealsToKeep = request.Meals.Select(m => m.MealType).ToList();
+
+            // Validate requested meal updates
+            foreach (var meal in request.Meals)
+            {
+                if (IsPastCutoff(groupBookings.First().FromDate, meal.MealType))
+                    errors.Add($"{meal.MealType}: Cutoff time has passed, cannot modify.");
+            }
+
+            // Check meals being cancelled are within cutoff
+            foreach (var existing in groupBookings)
+            {
+                if (!mealsToKeep.Contains(existing.MealType))
+                {
+                    if (IsPastCutoff(existing.FromDate, existing.MealType))
+                        errors.Add($"{existing.MealType}: Cutoff time has passed, cannot cancel.");
+                }
+            }
+
+            if (errors.Count > 0)
+                return BadRequest(new { message = "Update failed.", errors });
+
+            // Cancel meals not in the updated list
+            foreach (var existing in groupBookings)
+            {
+                if (!mealsToKeep.Contains(existing.MealType))
+                    existing.Status = "Cancelled";
+            }
+
+            // Update meals that are in the updated list
+            foreach (var meal in request.Meals)
+            {
+                var existing = groupBookings.FirstOrDefault(b => b.MealType == meal.MealType);
+                if (existing != null)
+                {
+                    existing.VegCount = meal.VegCount;
+                    existing.PaneerCount = meal.PaneerCount;
+                    existing.NonVegCount = meal.NonVegCount;
+                    existing.IsSpecialMeal = meal.IsSpecialMeal;
+                }
+            }
+
+            _context.SaveChanges();
+
+            return Ok(new { message = "Booking group updated successfully." });
         }
 
         // DELETE api/bookings/{id}
