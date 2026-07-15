@@ -62,3 +62,5 @@
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
 | POST | /api/Upload/photo | Admin only | Upload image (jpg/png/webp, max 5MB), returns relative URL |
+
+*Needs to be updated*
