@@ -322,6 +322,7 @@ namespace CanteenAPI.Controllers
                     }
                 }
 
+                //Validate isSpecialMeal
                 if (meal.IsSpecialMeal)
                 {
                     if (meal.MealType != "Lunch" && meal.MealType != "Dinner")
@@ -357,7 +358,7 @@ namespace CanteenAPI.Controllers
 
                     if (duplicateExists)
                     {
-                        errors.Add($"{meal.MealType}: Already have a booking for {currentDate:yyyy-MM-dd}.");
+                        errors.Add($"{meal.MealType}: Booking already exists for {currentDate:yyyy-MM-dd}.");
                         break;
                     }
                     currentDate = currentDate.AddDays(1);
@@ -527,6 +528,21 @@ namespace CanteenAPI.Controllers
                 var existing = groupBookings.FirstOrDefault(b => b.MealType == meal.MealType);
                 if (existing != null)
                 {
+                    
+                    //Validate isSpecialMeal
+                    if (meal.IsSpecialMeal)
+                    {
+                        if (meal.MealType != "Lunch" && meal.MealType != "Dinner")
+                            return BadRequest(new { message = $"{meal.MealType}: Today's Special is only available for Lunch and Dinner."});
+                
+                        var specialExists = _context.TodaysSpecials
+                            .Any(s => s.Date.Date == existing.FromDate.Date &&
+                                      s.MealType == meal.MealType &&
+                                      s.ApplicableOutlets.Contains(existing.CanteenLocation));
+                        if (!specialExists)
+                            return BadRequest(new { message = $"{meal.MealType}: No Today's Special available for the selected date and outlet."});
+                
+                }
                     existing.VegCount = meal.VegCount;
                     existing.PaneerCount = meal.PaneerCount;
                     existing.NonVegCount = meal.NonVegCount;
