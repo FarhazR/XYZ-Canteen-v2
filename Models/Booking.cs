@@ -23,6 +23,7 @@ namespace CanteenAPI.Models
         // Navigation property
         public Employee? Employee { get; set; }
         public NewUser? NewUser { get; set; }
+        public ICollection<BookingAddOn> AddOns { get; set; } = new List<BookingAddOn>();
 
         public bool IsCollected { get; set; } = false;
         public DateTime? CollectedAt { get; set; }

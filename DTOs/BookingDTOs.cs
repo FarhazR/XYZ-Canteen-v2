@@ -7,6 +7,7 @@ namespace CanteenAPI.DTOs
         public int PaneerCount { get; set; }
         public int NonVegCount { get; set; }
         public bool IsSpecialMeal { get; set; } = false;
+        public List<BookingAddOnRequest> AddOns { get; set; } = new();
     }
 
     public class CreateBookingRequest
@@ -60,6 +61,22 @@ namespace CanteenAPI.DTOs
         public bool CanModify { get; set; }
         public bool IsCollected { get; set; }
         public DateTime? CollectedAt { get; set; }
+        public decimal TotalCost { get; set; }
+        public List<BookingAddOnResponse> AddOns { get; set; } = new();
+    }
+
+    public class BookingAddOnRequest
+    {
+        public int AddOnID { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public class BookingAddOnResponse
+    {
+        public int AddOnID { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public decimal CostPerUnit { get; set; }
         public decimal TotalCost { get; set; }
     }
 }

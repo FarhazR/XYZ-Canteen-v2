@@ -28,6 +28,18 @@ namespace CanteenAPI.Data
                 context.SaveChanges();
             }
 
+            if (!context.AddOns.Any())
+            {
+                context.AddOns.Add(new AddOn
+                {
+                    Name = "Omelet",
+                    CostPerUnit = 10,
+                    IsAvailable = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+                context.SaveChanges();
+            }
+            
             if (context.MenuItems.Any())
             {
                 // Menu items already seeded, skip

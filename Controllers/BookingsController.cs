@@ -48,7 +48,11 @@ namespace CanteenAPI.Controllers
             var headCount = booking.BookingFor == "Guests" ? (booking.GuestCount ?? 1) : 1;
             var subtotal = vegCost + paneerCost + nonVegCost;
 
-            return subtotal > 0 ? subtotal : pricing.BaseCost * headCount;
+            var mealCost = subtotal > 0 ? subtotal : pricing.BaseCost * headCount;
+
+            var addOnCost = booking.AddOns?.Sum(a => a.TotalCost) ?? 0;
+
+            return mealCost + addOnCost;
         }
         
         public BookingsController(AppDbContext context)
@@ -83,6 +87,7 @@ namespace CanteenAPI.Controllers
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
                 .Include(b => b.NewUser)
+                .Include(b => b.AddOns).ThenInclude(ba => ba.AddOn)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
                 .Select(b => new BookingResponse
@@ -107,6 +112,14 @@ namespace CanteenAPI.Controllers
                     CollectedAt = b.CollectedAt,
                     TotalCost = CalculateTotalCost(b, pricingList),
                     BookingGroupID = b.BookingGroupID,
+                    AddOns = b.AddOns.Select(ba => new BookingAddOnResponse
+                    {
+                        AddOnID = ba.AddOnID,
+                        Name = ba.AddOn.Name,
+                        Quantity = ba.Quantity,
+                        CostPerUnit = ba.CostPerUnit,
+                        TotalCost = ba.TotalCost
+                    }).ToList(),
                     CanModify = b.Status == "Confirmed" && b.FromDate.Date >= DateTime.Today && !IsPastCutoff(b.FromDate, b.MealType)
                 })
                 .ToList();
@@ -127,6 +140,7 @@ namespace CanteenAPI.Controllers
             var bookings = _context.Bookings
                 .Include(b => b.Employee)
                 .Include(b => b.NewUser)
+                .Include(b => b.AddOns).ThenInclude(ba => ba.AddOn)
                 .Where(b => userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID)
                 .OrderByDescending(b => b.FromDate)
                 .ToList()
@@ -152,6 +166,14 @@ namespace CanteenAPI.Controllers
                     CollectedAt = b.CollectedAt,
                     TotalCost = CalculateTotalCost(b, pricingList),
                     BookingGroupID = b.BookingGroupID,
+                    AddOns = b.AddOns.Select(ba => new BookingAddOnResponse
+                    {
+                        AddOnID = ba.AddOnID,
+                        Name = ba.AddOn.Name,
+                        Quantity = ba.Quantity,
+                        CostPerUnit = ba.CostPerUnit,
+                        TotalCost = ba.TotalCost
+                    }).ToList(),
                     CanModify = b.Status == "Confirmed" &&
                                 b.FromDate.Date >= DateTime.Today &&
                                 !IsPastCutoff(b.FromDate, b.MealType)
@@ -174,6 +196,7 @@ namespace CanteenAPI.Controllers
             var booking = _context.Bookings
                 .Include(b => b.Employee)
                 .Include(b => b.NewUser)
+                .Include(b => b.AddOns).ThenInclude(ba => ba.AddOn)
                 .Where(b => b.BookingID == id && (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID))
                 .FirstOrDefault();
 
@@ -203,6 +226,14 @@ namespace CanteenAPI.Controllers
                 CollectedAt = booking.CollectedAt,
                 TotalCost = CalculateTotalCost(booking, pricingList),
                 BookingGroupID = booking.BookingGroupID,
+                AddOns = booking.AddOns.Select(ba => new BookingAddOnResponse
+                {
+                    AddOnID = ba.AddOnID,
+                    Name = ba.AddOn.Name,
+                    Quantity = ba.Quantity,
+                    CostPerUnit = ba.CostPerUnit,
+                    TotalCost = ba.TotalCost
+                }).ToList(),
                 CanModify = booking.Status == "Confirmed" &&
                             booking.FromDate.Date >= DateTime.Today &&
                             !IsPastCutoff(booking.FromDate, booking.MealType)
@@ -364,6 +395,33 @@ namespace CanteenAPI.Controllers
 
                 _context.Bookings.Add(booking);
                 _context.SaveChanges();
+
+                // Process add-ons for this booking
+                if (meal.AddOns != null && meal.AddOns.Count > 0)
+                {
+                    foreach (var addOnRequest in meal.AddOns)
+                    {
+                        var addOn = _context.AddOns
+                            .FirstOrDefault(a => a.AddOnID == addOnRequest.AddOnID && a.IsAvailable);
+
+                        if (addOn == null) continue;
+
+                        if (addOnRequest.Quantity <= 0) continue;
+
+                        var bookingAddOn = new BookingAddOn
+                        {
+                            BookingID = booking.BookingID,
+                            AddOnID = addOn.AddOnID,
+                            Quantity = addOnRequest.Quantity,
+                            CostPerUnit = addOn.CostPerUnit,
+                            TotalCost = addOnRequest.Quantity * addOn.CostPerUnit
+                        };
+                        
+                        _context.BookingAddOns.Add(bookingAddOn);
+                    }
+                    _context.SaveChanges();
+                }
+
                 createdBookings.Add(booking.BookingID);
             }
 
@@ -473,6 +531,37 @@ namespace CanteenAPI.Controllers
                     existing.PaneerCount = meal.PaneerCount;
                     existing.NonVegCount = meal.NonVegCount;
                     existing.IsSpecialMeal = meal.IsSpecialMeal;
+
+                    // Update add-ons
+                    if (meal.AddOns != null)
+                    {
+                        // Remove existing add-ons for this booking
+                        var existingAddOns = _context.BookingAddOns
+                            .Where(ba => ba.BookingID == existing.BookingID)
+                            .ToList();
+                        _context.BookingAddOns.RemoveRange(existingAddOns);
+
+                        // Add updated add-ons
+                        foreach (var addOnRequest in meal.AddOns)
+                        {
+                            var addOn = _context.AddOns
+                                .FirstOrDefault(a => a.AddOnID == addOnRequest.AddOnID && a.IsAvailable);
+
+                            if (addOn == null) continue;
+                            if (addOnRequest.Quantity <= 0) continue;
+
+                            _context.BookingAddOns.Add(new BookingAddOn
+                            {
+                                BookingID = existing.BookingID,
+                                AddOnID = addOn.AddOnID,
+                                Quantity = addOnRequest.Quantity,
+                                CostPerUnit = addOn.CostPerUnit,
+                                TotalCost = addOnRequest.Quantity * addOn.CostPerUnit
+                            });
+                        }
+                        _context.SaveChanges();
+                    }
+
                 }
             }
 

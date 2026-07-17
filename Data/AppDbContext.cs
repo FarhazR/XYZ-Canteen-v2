@@ -15,6 +15,8 @@ namespace CanteenAPI.Data
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<MealPricing> MealPricing { get; set; }
+        public DbSet<AddOn> AddOns { get; set; }
+        public DbSet<BookingAddOn> BookingAddOns { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
