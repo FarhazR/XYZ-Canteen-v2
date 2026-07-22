@@ -83,48 +83,62 @@ namespace CanteenAPI.Controllers
         public IActionResult GetAll()
         {
             var pricingList = _context.MealPricing.ToList();
-            
+
             var bookings = _context.Bookings
-                .Include(b => b.Employee)
                 .Include(b => b.NewUser)
                 .Include(b => b.AddOns).ThenInclude(ba => ba.AddOn)
                 .OrderByDescending(b => b.FromDate)
-                .ToList()
-                .Select(b => new BookingResponse
-                {
-                    BookingID = b.BookingID,
-                    EmployeeID = b.EmployeeID,
-                    NewUserID = b.NewUserID,
-                    EmployeeName = b.Employee != null ? b.Employee.Name : string.Empty,
-                    FromDate = b.FromDate,
-                    ToDate = b.ToDate,
-                    CanteenLocation = b.CanteenLocation,
-                    MealType = b.MealType,
-                    BookingFor = b.BookingFor,
-                    GuestCount = b.GuestCount,
-                    VegCount = b.VegCount,
-                    PaneerCount = b.PaneerCount,
-                    NonVegCount = b.NonVegCount,
-                    IsSpecialMeal = b.IsSpecialMeal,
-                    Status = b.Status,
-                    CreatedAt = b.CreatedAt,
-                    IsCollected = b.IsCollected,
-                    CollectedAt = b.CollectedAt,
-                    TotalCost = CalculateTotalCost(b, pricingList),
-                    BookingGroupID = b.BookingGroupID,
-                    AddOns = b.AddOns.Select(ba => new BookingAddOnResponse
-                    {
-                        AddOnID = ba.AddOnID,
-                        Name = ba.AddOn.Name,
-                        Quantity = ba.Quantity,
-                        CostPerUnit = ba.CostPerUnit,
-                        TotalCost = ba.TotalCost
-                    }).ToList(),
-                    CanModify = b.Status == "Confirmed" && b.FromDate.Date >= DateTime.Today && !IsPastCutoff(b.FromDate, b.MealType)
-                })
                 .ToList();
 
-            return Ok(bookings);
+            // Manually resolve employee names for IT employee bookings
+            var employeeIDs = bookings
+                .Where(b => b.EmployeeID != null)
+                .Select(b => b.EmployeeID!.Value)
+                .Distinct()
+                .ToList();
+
+            var employeeNames = _context.Employee
+                .Where(e => employeeIDs.Contains(e.ID))
+                .ToDictionary(e => e.ID, e => e.Name);
+
+            var result = bookings.Select(b => new BookingResponse
+            {
+                BookingID = b.BookingID,
+                EmployeeID = b.EmployeeID,
+                NewUserID = b.NewUserID,
+                EmployeeName = b.EmployeeID != null
+                    ? (employeeNames.TryGetValue(b.EmployeeID.Value, out var eName) ? eName : string.Empty)
+                    : b.NewUser != null ? b.NewUser.Name : string.Empty,
+                FromDate = b.FromDate,
+                ToDate = b.ToDate,
+                CanteenLocation = b.CanteenLocation,
+                MealType = b.MealType,
+                BookingFor = b.BookingFor,
+                GuestCount = b.GuestCount,
+                VegCount = b.VegCount,
+                PaneerCount = b.PaneerCount,
+                NonVegCount = b.NonVegCount,
+                IsSpecialMeal = b.IsSpecialMeal,
+                Status = b.Status,
+                CreatedAt = b.CreatedAt,
+                IsCollected = b.IsCollected,
+                CollectedAt = b.CollectedAt,
+                TotalCost = CalculateTotalCost(b, pricingList),
+                BookingGroupID = b.BookingGroupID,
+                AddOns = b.AddOns.Select(ba => new BookingAddOnResponse
+                {
+                    AddOnID = ba.AddOnID,
+                    Name = ba.AddOn.Name,
+                    Quantity = ba.Quantity,
+                    CostPerUnit = ba.CostPerUnit,
+                    TotalCost = ba.TotalCost
+                }).ToList(),
+                CanModify = b.Status == "Confirmed" &&
+                            b.FromDate.Date >= DateTime.Today &&
+                            !IsPastCutoff(b.FromDate, b.MealType)
+            }).ToList();
+
+            return Ok(result);
         }
 
         // GET api/bookings/my
