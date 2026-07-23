@@ -24,12 +24,14 @@ namespace CanteenAPI.Controllers
         {
             var publishedBy = User.Identity?.Name ?? "Admin";
 
+            DateTime now = DateTime.Now;
+
             var announcement = new Announcement
             {
                 Title = dto.Title,
                 Message = dto.Message,
                 PublishedBy = publishedBy,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now,
             };
 
             _context.Announcements.Add(announcement);
