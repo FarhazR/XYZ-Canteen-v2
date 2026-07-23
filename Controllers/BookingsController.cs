@@ -204,6 +204,7 @@ namespace CanteenAPI.Controllers
         {
             var userID = GetCurrentUserID();
             var userType = GetCurrentUserType();
+            var isAdmin = User.IsInRole("Admin");
 
             var pricingList = _context.MealPricing.ToList();
             
