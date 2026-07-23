@@ -211,7 +211,7 @@ namespace CanteenAPI.Controllers
                 .Include(b => b.Employee)
                 .Include(b => b.NewUser)
                 .Include(b => b.AddOns).ThenInclude(ba => ba.AddOn)
-                .Where(b => b.BookingID == id && (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID))
+                .Where(b => b.BookingID == id && (isAdmin || (userType == "Employee" ? b.EmployeeID == userID : b.NewUserID == userID)))
                 .FirstOrDefault();
 
             if (booking == null)
